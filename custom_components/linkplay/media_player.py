@@ -134,6 +134,8 @@ SPOTIFY_PAUSED_TIMEOUT = timedelta(seconds=300)
 AUTOIDLE_STATE_TIMEOUT = timedelta(seconds=1)
 #PARALLEL_UPDATES = 0
 
+DEBUG = False
+
 CUT_EXTENSIONS = ['mp3', 'mp2', 'm2a', 'mpg', 'wav', 'aac', 'flac', 'flc', 'm4a', 'ape', 'wma', 'ac3', 'ogg']
 
 SOUND_MODES = {'0': 'Normal', '1': 'Classic', '2': 'Pop', '3': 'Jazz', '4': 'Vocal'}
@@ -272,6 +274,22 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             response,
         )
         state = STATE_UNAVAILABLE
+
+    if DEBUG:
+        response = None
+        try:
+            cmd = endpoints['getPlayerStatus'] if endpoints is not None and 'getPlayerStatus' in endpoints else "getPlayerStatus"
+            initurl = "{}://{}/httpapi.asp?command={}"
+            response = await websession.get(initurl.format(protocol,host,cmd), ssl=ssl_ctx)
+
+        except (asyncio.TimeoutError, aiohttp.ClientError) as error:
+            _LOGGER.warning(
+                "Failed communicating with LinkPlayDevice (start) '%s': uuid: %s %s", host, uuid, type(error)
+            )
+
+        if response and response.status == HTTPStatus.OK:
+            data = await response.json(content_type=None)
+            _LOGGER.debug("HOST: %s PLAYER STATUS response: %s", host, data)
 
     linkplay = LinkPlayDevice(name, 
                             host, 
