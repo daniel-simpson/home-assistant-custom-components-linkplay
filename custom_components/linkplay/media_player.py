@@ -99,6 +99,7 @@ ATTR_TTS = 'tts_active'
 ATTR_SNAPSHOT = 'snapshot_active'
 ATTR_SNAPSPOT = 'snapshot_spotify'
 ATTR_DEBUG = 'debug_info'
+ATTR_AUDIO_CHANNEL = 'audio_channel'
 
 CONF_NAME = 'name'
 CONF_LASTFM_API_KEY = 'lastfm_api_key'
@@ -137,6 +138,8 @@ MROOM_UJWROU = timedelta(seconds=3)
 SPOTIFY_PAUSED_TIMEOUT = timedelta(seconds=300)
 AUTOIDLE_STATE_TIMEOUT = timedelta(seconds=1)
 #PARALLEL_UPDATES = 0
+
+DEBUG = False
 
 CUT_EXTENSIONS = ['mp3', 'mp2', 'm2a', 'mpg', 'wav', 'aac', 'flac', 'flc', 'm4a', 'ape', 'wma', 'ac3', 'ogg']
 
@@ -296,6 +299,22 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             response,
         )
         state = STATE_UNAVAILABLE
+
+    if DEBUG:
+        response = None
+        try:
+            cmd = endpoints['getPlayerStatus'] if endpoints is not None and 'getPlayerStatus' in endpoints else "getPlayerStatus"
+            initurl = "{}://{}/httpapi.asp?command={}"
+            response = await websession.get(initurl.format(protocol,host,cmd), ssl=ssl_ctx)
+
+        except (asyncio.TimeoutError, aiohttp.ClientError) as error:
+            _LOGGER.warning(
+                "Failed communicating with LinkPlayDevice (start) '%s': uuid: %s %s", host, uuid, type(error)
+            )
+
+        if response and response.status == HTTPStatus.OK:
+            data = await response.json(content_type=None)
+            _LOGGER.debug("HOST: %s PLAYER STATUS response: %s", host, data)
 
     linkplay = LinkPlayDevice(name, 
                             host, 
@@ -677,6 +696,15 @@ class LinkPlayDevice(MediaPlayerEntity):
                             self._first_update = False
 
             self._position_updated_at = utcnow()
+
+            if self._player_statdata['ch'] is not None:
+                audio_channel = self._player_statdata['ch']
+                if audio_channel == '0':
+                    self._audio_channel = 'LR'
+                elif audio_channel == '1':
+                    self._audio_channel = 'L'
+                elif audio_channel == '2':
+                    self._audio_channel = 'R'
 
             if self._player_statdata['type'] == '0':
                 self._slave_mode = False
@@ -1195,6 +1223,10 @@ class LinkPlayDevice(MediaPlayerEntity):
     def extra_state_attributes(self):
         """List members in group and set master and slave state."""
         attributes = {}
+
+        if self._audio_channel is not None:
+            attributes[ATTR_AUDIO_CHANNEL] = self._audio_channel
+
         if self._multiroom_group != []:
             attributes[ATTR_LINKPLAY_GROUP] = self._multiroom_group
             attributes[ATTR_GROUP_MEMBERS] = self._multiroom_group
