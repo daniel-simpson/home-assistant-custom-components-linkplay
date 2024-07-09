@@ -97,6 +97,7 @@ ATTR_TTS = 'tts_active'
 ATTR_SNAPSHOT = 'snapshot_active'
 ATTR_SNAPSPOT = 'snapshot_spotify'
 ATTR_DEBUG = 'debug_info'
+ATTR_AUDIO_CHANNEL = 'audio_channel'
 
 CONF_NAME = 'name'
 CONF_LASTFM_API_KEY = 'lastfm_api_key'
@@ -638,6 +639,15 @@ class LinkPlayDevice(MediaPlayerEntity):
 
             self._position_updated_at = utcnow()
 
+            if self._player_statdata['ch'] is not None:
+                audio_channel = self._player_statdata['ch']
+                if audio_channel == '0':
+                    self._audio_channel = 'LR'
+                elif audio_channel == '1':
+                    self._audio_channel = 'L'
+                elif audio_channel == '2':
+                    self._audio_channel = 'R'
+
             if self._player_statdata['type'] == '0':
                 self._slave_mode = False
 
@@ -1155,6 +1165,10 @@ class LinkPlayDevice(MediaPlayerEntity):
     def extra_state_attributes(self):
         """List members in group and set master and slave state."""
         attributes = {}
+
+        if self._audio_channel is not None:
+            attributes[ATTR_AUDIO_CHANNEL] = self._audio_channel
+
         if self._multiroom_group != []:
             attributes[ATTR_LINKPLAY_GROUP] = self._multiroom_group
             attributes[ATTR_GROUP_MEMBERS] = self._multiroom_group
