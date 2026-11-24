@@ -119,6 +119,10 @@ command:
             - reboot
             - 'WriteDeviceNameToUnit: My Device Name'
             - 'SetApSSIDName: NewWifiName'
+            - 'DEBUG: getStatus'
+            - 'DEBUG: getPlayerStatus'
+            - 'DEBUG: Metadata'
+            - 'DEBUG: getFileInfo'
     notify:
       name: Notification
       description: Displays the result of the command as a persistent notification in Lovelace UI (optional, defaults to True). Set to False during automations to avoid seeing these.

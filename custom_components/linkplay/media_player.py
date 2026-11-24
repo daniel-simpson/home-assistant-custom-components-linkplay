@@ -306,6 +306,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
             cmd = endpoints['getPlayerStatus'] if endpoints is not None and 'getPlayerStatus' in endpoints else "getPlayerStatus"
             initurl = "{}://{}/httpapi.asp?command={}"
             response = await websession.get(initurl.format(protocol,host,cmd), ssl=ssl_ctx)
+            _LOGGER.warning("Get player status %s response %s", cmd, dumps(response))
 
         except (asyncio.TimeoutError, aiohttp.ClientError) as error:
             _LOGGER.warning(
@@ -363,6 +364,7 @@ class LinkPlayDevice(MediaPlayerEntity):
         self._service = None
         self._features = None
         self._preset_key = 4
+        self._last_preset = 0
         self._name = name
         self._host = host
         self._protocol = protocol
@@ -402,6 +404,7 @@ class LinkPlayDevice(MediaPlayerEntity):
         self._media_uri = None
         self._media_uri_final = None
         self._media_source_uri = None
+        self._playstatus_debug = {}
         self._nometa = False
         self._player_statdata = {}
         self._lastfm_api_key = lastfm_api_key
@@ -444,6 +447,8 @@ class LinkPlayDevice(MediaPlayerEntity):
         self._snap_media_source_uri = None
         self._snap_seek = False
         self._snap_playhead_position = 0
+        self._audio_channel = "LR"
+        self._debug_debug = None
         
     async def async_added_to_hass(self):
         """Record entity."""
@@ -813,7 +818,7 @@ class LinkPlayDevice(MediaPlayerEntity):
             else:
                 self._source = 'Web playlist'
 
-            if self._source != 'Network' and not (self._playing_stream or self._playing_localfile or self._playing_spotify):
+            if self._source != 'Network' and not (self._source == "Bluetooth" or self._playing_stream or self._playing_localfile or self._playing_spotify):
                 #_LOGGER.debug("08 Line Inputs: %s, %s", self.entity_id, self._name)
                 if self._source == 'Idle':
                     self._state = STATE_IDLE
@@ -1246,6 +1251,12 @@ class LinkPlayDevice(MediaPlayerEntity):
         attributes[ATTR_TTS] = self._playing_tts
         attributes[ATTR_SNAPSHOT] = self._snapshot_active
         attributes[ATTR_SNAPSPOT] = self._snap_spotify
+
+        # attributes[ATTR_PRESET] = self._preset
+        attributes['MEDIA_TITLE'] = self._media_title
+        attributes['MEDIA_ARTIST'] = self._media_artist
+        attributes['MEDIA_ALBUM'] = self._media_album
+        attributes['PLAYER_STATUS_DEBUG'] = self._playstatus_debug
 
         if DEBUGSTR_ATTR:
             atrdbg = ""
@@ -1945,6 +1956,8 @@ class LinkPlayDevice(MediaPlayerEntity):
             else:
                 self._media_album = None
 
+        self._playstatus_debug = dumps(plr_stat)
+
         if self._media_title is not None and self._media_artist is not None:
             return True
         else:
@@ -2526,6 +2539,14 @@ class LinkPlayDevice(MediaPlayerEntity):
             value = await self.call_linkplay_httpapi("reboot;", None)
         elif command == 'restoreToDefault':
             value = await self.call_linkplay_httpapi("restoreToDefault", None)
+        elif command == 'DEBUG: getStatus':
+            value = await self.call_linkplay_httpapi("getStatus", True, "https")
+        elif command == 'DEBUG: getPlayerStatus':
+            value = await self.call_linkplay_httpapi("getPlayerStatus", True)
+        elif command == 'DEBUG: Metadata':
+            value = await self.async_get_playerstatus_metadata(self._player_statdata)
+        elif command == 'DEBUG: getFileInfo':
+            value = await self.call_linkplay_httpapi("getFileInfo:{0}:{1}".format(0, 1), True)
         else:
             value = "No such command implemented."
             _LOGGER.warning("Player %s command: %s, result: %s", self.entity_id, command, value)
